@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+  KIDOO HUB — tokens de design
+  Marca: branco #FFFFFF · verde principal #353F34 · verde escuro #2A3229
+  A escala `kidoo` deriva dos dois verdes oficiais (700 = principal, 900 = escuro).
+*/
+@theme {
+  --color-kidoo-50: #f5f7f5;
+  --color-kidoo-100: #e9eee9;
+  --color-kidoo-200: #d4ddd3;
+  --color-kidoo-300: #b4c2b2;
+  --color-kidoo-400: #8b9d89;
+  --color-kidoo-500: #687a66;
+  --color-kidoo-600: #4d5b4c;
+  --color-kidoo-700: #353f34;
+  --color-kidoo-800: #2f382e;
+  --color-kidoo-900: #2a3229;
+  --color-kidoo-950: #1c221b;
+
+  --color-success: #2f7d4f;
+  --color-success-soft: #e6f2ea;
+  --color-warning: #9a6a12;
+  --color-warning-soft: #fbf1dc;
+  --color-danger: #b3392f;
+  --color-danger-soft: #fbe9e7;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-card: 0.875rem;
+
+  --shadow-card: 0 1px 2px rgb(28 34 27 / 0.04), 0 1px 1px rgb(28 34 27 / 0.03);
+  --shadow-pop: 0 12px 32px -8px rgb(28 34 27 / 0.22), 0 2px 6px rgb(28 34 27 / 0.08);
+
+  --animate-fade-up: fade-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.2s ease-out both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  background: #ffffff;
+  color: var(--color-kidoo-950);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100dvh;
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  background: var(--color-kidoo-200);
+  color: var(--color-kidoo-950);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-kidoo-600);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
