@@ -1,6 +1,6 @@
 # KIDOO HUB — Arquitetura
 
-> Documento vivo. Status: **Fase 1 (auditoria e arquitetura) concluída; Fase 2 (fundação) implementada**.
+> Documento vivo. Status: **Fases 1–2 concluídas; Fase 3 (Chatwoot) implementada** — header HTTP `api-access-token` (hífen) obrigatório no Nginx.
 > Itens marcados com **[VERIFICAR]** dependem de confirmação na versão instalada do Chatwoot / na conta Meta e
 > **não** devem ser tratados como fato até serem testados contra os serviços reais.
 
@@ -253,7 +253,7 @@ Pré-requisitos externos (não existem hoje): app Meta verificado, Business Veri
 | --- | --- | --- |
 | 1 | Auditoria + arquitetura | ✅ |
 | 2 | Design system, layout, auth, empresas, usuários, permissões, isolamento, testes RLS | ✅ (sem Supabase real: ver `docs/SETUP.md`) |
-| 3 | Cliente Chatwoot, contas, inboxes, contatos, conversas, mensagens, webhooks, logs | ⏳ |
+| 3 | Cliente Chatwoot, contas, inboxes, contatos, conversas, mensagens, webhooks, logs | ✅ (header `api-access-token`; WhatsApp Inbox = Fase 4) |
 | 4 | Embedded Signup, conexão de números, provisionamento, limites, desconexão | ⏳ |
 | 5 | Inbox 3 colunas, Realtime, atribuições, filtros | ⏳ |
 | 6 | Contatos + CRM | ⏳ |

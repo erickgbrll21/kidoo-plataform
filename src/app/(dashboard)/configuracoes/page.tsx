@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
+import { ChatwootCard } from "@/components/settings/chatwoot-card";
 import { OrganizationForm, PasswordForm, ProfileForm } from "@/components/settings/settings-forms";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { auditLabel } from "@/lib/audit-labels";
 import { can, requireTenantContext } from "@/lib/auth/dal";
+import { isChatwootConfigured } from "@/lib/env";
 import { formatDateTime } from "@/lib/utils";
+import { getChatwootAccountStatus } from "@/services/chatwoot/provision";
 import { countActiveMembers, getEffectiveLimits, getPlanSummary, listAuditLogs } from "@/services/organizations/service";
 
 export const metadata: Metadata = { title: "Configurações" };
@@ -25,10 +28,11 @@ const limitText = (v: number | null | undefined) => (v == null ? "Ilimitado" : v
 async function SettingsContent() {
   const ctx = await requireTenantContext();
   const orgId = ctx.organization.id;
-  const [limits, members, audit] = await Promise.all([
+  const [limits, members, audit, chatwoot] = await Promise.all([
     getEffectiveLimits(orgId),
     countActiveMembers(orgId),
     can(ctx, "audit.read") ? listAuditLogs(orgId, 20) : Promise.resolve([]),
+    getChatwootAccountStatus(orgId),
   ]);
   const plan = limits ? await getPlanSummary(limits.plan_key) : null;
 
@@ -69,6 +73,25 @@ async function SettingsContent() {
         </CardHeader>
         <CardContent>
           <PasswordForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Chatwoot</CardTitle>
+          <CardDescription>
+            Infraestrutura de atendimento da empresa. Conta provisionada automaticamente; WhatsApp entra na Fase 4.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChatwootCard
+            configured={isChatwootConfigured()}
+            canManage={can(ctx, "settings.manage")}
+            status={chatwoot?.status ?? null}
+            chatwootAccountId={chatwoot?.chatwoot_account_id ?? null}
+            lastError={chatwoot?.last_error ?? null}
+            provisionedAt={chatwoot?.provisioned_at ?? null}
+          />
         </CardContent>
       </Card>
 

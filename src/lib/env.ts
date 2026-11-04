@@ -18,6 +18,12 @@ const serverSchema = z.object({
   /** 32 bytes em base64 — cifra tokens de integrações (Chatwoot/Meta/IA). */
   KIDOO_ENCRYPTION_KEY: z.string().optional(),
   KIDOO_ENCRYPTION_KEY_ID: z.string().default("v1"),
+  /** Instância Chatwoot self-hosted (Fase 3). Ausente = integração desligada. */
+  CHATWOOT_BASE_URL: z.string().url().optional(),
+  CHATWOOT_PLATFORM_TOKEN: z.string().min(10).optional(),
+  CHATWOOT_VERSION: z.string().default("4.18.0"),
+  /** Protege rotas de reprocessamento de webhooks / cron. */
+  CRON_SECRET: z.string().min(16).optional(),
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;
@@ -68,4 +74,27 @@ export function serverEnv(): ServerEnv {
 
 export function isServiceRoleConfigured(): boolean {
   return serverSchema.safeParse(process.env).success;
+}
+
+/** Chatwoot só é considerado configurado com URL + Platform Token. */
+export function isChatwootConfigured(): boolean {
+  const env = process.env;
+  return Boolean(env.CHATWOOT_BASE_URL && env.CHATWOOT_PLATFORM_TOKEN);
+}
+
+export function chatwootEnv() {
+  const env = serverEnv();
+  if (!env.CHATWOOT_BASE_URL || !env.CHATWOOT_PLATFORM_TOKEN) {
+    throw new EnvError("Chatwoot não configurado (CHATWOOT_BASE_URL / CHATWOOT_PLATFORM_TOKEN). Veja docs/SETUP.md.");
+  }
+  if (!env.KIDOO_ENCRYPTION_KEY) {
+    throw new EnvError("KIDOO_ENCRYPTION_KEY é obrigatória para cifrar tokens do Chatwoot.");
+  }
+  return {
+    baseUrl: env.CHATWOOT_BASE_URL.replace(/\/$/, ""),
+    platformToken: env.CHATWOOT_PLATFORM_TOKEN,
+    version: env.CHATWOOT_VERSION,
+    encryptionKey: env.KIDOO_ENCRYPTION_KEY,
+    encryptionKeyId: env.KIDOO_ENCRYPTION_KEY_ID,
+  };
 }

@@ -163,6 +163,22 @@ export async function createOrganizationAction(_prev: ActionState, formData: For
     });
   }
 
+  // Fase 3: provisiona conta Chatwoot (falha não bloqueia o cadastro da empresa)
+  try {
+    const { isChatwootConfigured } = await import("@/lib/env");
+    if (isChatwootConfigured()) {
+      const { provisionChatwootAccount } = await import("@/services/chatwoot/provision");
+      const cw = await provisionChatwootAccount({
+        organizationId: result.data.id,
+        organizationName: parsedInput.name,
+        organizationSlug: parsedInput.slug,
+      });
+      if (!cw.ok) console.error("[onboarding] chatwoot", cw.error);
+    }
+  } catch (err) {
+    console.error("[onboarding] chatwoot provision", err);
+  }
+
   (await cookies()).set(ACTIVE_ORG_COOKIE, result.data.id, {
     httpOnly: true,
     sameSite: "lax",

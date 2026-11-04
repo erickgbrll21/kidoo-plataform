@@ -5,9 +5,11 @@ import { z } from "zod";
 import { authorizeAction, fail, fieldErrorsOf, formObject, keepValues, succeed, type ActionState } from "@/lib/actions";
 import { getSessionUser } from "@/lib/auth/dal";
 import { createClient } from "@/lib/database/server";
+import { isChatwootConfigured } from "@/lib/env";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { passwordSchema } from "@/lib/validations/auth";
 import { updateOrganizationSchema, updateProfileSchema } from "@/lib/validations/team";
+import { provisionChatwootAccount } from "@/services/chatwoot/provision";
 import { updateOrganizationName } from "@/services/organizations/service";
 
 export async function updateOrganizationAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -75,4 +77,27 @@ export async function changePasswordAction(_prev: ActionState, formData: FormDat
     return fail("Não foi possível alterar a senha.");
   }
   return succeed("Senha alterada com sucesso.");
+}
+
+/** Provisiona ou tenta novamente a conta Chatwoot da empresa ativa. */
+export async function provisionChatwootAction(_prev: ActionState, _formData: FormData): Promise<ActionState> {
+  const auth = await authorizeAction("settings.manage");
+  if (!auth.ok) return auth.state;
+  if (!isChatwootConfigured()) {
+    return fail("Chatwoot não está configurado no servidor (CHATWOOT_BASE_URL / CHATWOOT_PLATFORM_TOKEN).");
+  }
+
+  const limit = await rateLimit({ key: `cw-provision:org:${auth.ctx.organization.id}`, max: 5, windowSeconds: 900 });
+  if (!limit.allowed) return fail("Muitas tentativas. Aguarde alguns minutos.");
+
+  const result = await provisionChatwootAccount({
+    organizationId: auth.ctx.organization.id,
+    organizationName: auth.ctx.organization.name,
+    organizationSlug: auth.ctx.organization.slug,
+  });
+  revalidatePath("/configuracoes");
+  revalidatePath("/canais");
+  return result.ok
+    ? succeed(`Conta Chatwoot ativa (ID ${result.data.chatwoot_account_id}).`)
+    : fail(result.error);
 }
