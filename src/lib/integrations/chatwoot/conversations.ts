@@ -30,6 +30,38 @@ export async function getConversation(accountId: number, conversationId: number,
   );
 }
 
+/** Cria conversa na Inbox (canal API) com primeira mensagem opcional. */
+export async function createConversation(
+  accountId: number,
+  accountToken: string,
+  input: {
+    inboxId: number;
+    contactId: number;
+    sourceId: string;
+    content?: string;
+    messageType?: "incoming" | "outgoing";
+  },
+) {
+  return chatwootFetch<ChatwootConversation>(`/api/v1/accounts/${accountId}/conversations`, {
+    token: accountToken,
+    method: "POST",
+    body: {
+      inbox_id: input.inboxId,
+      contact_id: input.contactId,
+      source_id: input.sourceId,
+      status: "open",
+      ...(input.content
+        ? {
+            message: {
+              content: input.content,
+              message_type: input.messageType ?? "incoming",
+            },
+          }
+        : {}),
+    },
+  });
+}
+
 export async function updateConversationStatus(
   accountId: number,
   conversationId: number,

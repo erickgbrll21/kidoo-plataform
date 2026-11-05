@@ -1,6 +1,6 @@
 # KIDOO HUB — Arquitetura
 
-> Documento vivo. Status: **Fases 1–3 concluídas** — Chatwoot com `api-access-token`, agentes, cron e dead-letter.
+> Documento vivo. Status: **Fases 1–4 em código** — Chatwoot ok; WhatsApp via **Z-API** (instância + webhook).
 > Itens marcados com **[VERIFICAR]** dependem de confirmação na versão instalada do Chatwoot / na conta Meta e
 > **não** devem ser tratados como fato até serem testados contra os serviços reais.
 
@@ -115,9 +115,9 @@ Funções SQL (todas `search_path` fixo): `is_org_member`, `has_org_permission`,
   sem política de leitura para clientes; somente service role).
 - `chatwoot_accounts` (1:1 com organização): `organization_id`, `chatwoot_account_id`, `service_agent_id`,
   `secret_id`, `webhook_secret_id`, `status`. `UNIQUE(organization_id)` e `UNIQUE(chatwoot_account_id)`.
-- `whatsapp_connections`: `organization_id`, `waba_id`, `phone_number_id`, `display_phone_number`, `status`,
-  `connected_at`, `last_synced_at`, `ai_agent_id`, `business_hours`, `secret_id` (token Meta).
-  `UNIQUE(phone_number_id)` **global** — um número não pode estar em dois tenants.
+- `whatsapp_connections`: `organization_id`, `provider` (`zapi`), `zapi_instance_id`, `display_phone_number`,
+  `status`, `token_secret_id`, `webhook_secret_id`, `connected_at`, `last_synced_at`.
+  `UNIQUE(zapi_instance_id)` **global** — uma instância Z-API não pode estar em dois tenants.
 - `chatwoot_inboxes`: `connection_id`, `chatwoot_account_id`, `chatwoot_inbox_id` com FK composta
   `(organization_id, chatwoot_account_id)` → `chatwoot_accounts`, garantindo que a Inbox pertence à conta do tenant.
 - `contacts`, `contact_links` (contato KIDOO ↔ contato Chatwoot), `conversations_index`, `messages_mirror`
@@ -197,27 +197,21 @@ são aceitos somente se `account.id` do payload bater com um `chatwoot_accounts`
 **Fonte da verdade.** Chatwoot é a fonte para conversas/mensagens; a KIDOO mantém um espelho enxuto para
 listagem, relatórios, Realtime e contexto de IA, com política de retenção (LGPD).
 
-## 7. Múltiplos WhatsApps (Fase 4)
+## 7. Múltiplos WhatsApps (Fase 4) — Z-API
 
-Fluxo planejado (Meta como *Tech Provider*, app da KIDOO):
+Fluxo atual (provedor **Z-API**, não Cloud API oficial da Meta):
 
-1. UI "Adicionar WhatsApp" → backend verifica limite do plano (`org_effective_limits`) e cria um `state`
-   anti-CSRF vinculado ao usuário/empresa.
-2. **Embedded Signup** (JS SDK da Meta) devolve `code` + `waba_id` + `phone_number_id` ao navegador, que os envia ao
-   backend. O navegador **nunca** recebe token de negócio.
-3. Backend troca o `code` por token no servidor, **valida propriedade** (consulta a Graph API: o `phone_number_id`
-   pertence ao `waba_id`; o `waba_id` está nas WABAs compartilhadas via `debug_token`), assina o app às webhooks da
-   WABA e registra o número.
-4. Backend cifra o token, cria a Inbox WhatsApp Cloud na conta Chatwoot da empresa e grava `whatsapp_connections`
-   + `chatwoot_inboxes` numa única operação compensável (se o Chatwoot falhar, a conexão é revertida).
-5. Entrega de mensagens: **[VERIFICAR]** — a Meta aceita um único callback por app, mas permite
-   `override_callback_uri` por WABA. Plano: apontar a WABA para o webhook da Inbox no Chatwoot e a KIDOO consumir os
-   eventos pelos webhooks do Chatwoot. Alternativa: webhook KIDOO → repasse ao Chatwoot.
-6. Limite por plano reforçado também no banco (trigger em `whatsapp_connections`) — defesa em profundidade.
-7. Desconexão: revoga/descarta token, desassina a WABA, desativa a Inbox (não apaga histórico), registra auditoria.
+1. UI `/canais` → admin informa **Instance ID**, **Token** e **Client-Token** (nunca expostos depois).
+2. Backend valida `GET .../status` (instância conectada), busca telefone em `.../device` se possível.
+3. Cifra credenciais em `integration_secrets` (`purpose = zapi_instance`), grava `whatsapp_connections`.
+4. Em HTTPS, configura `PUT .../update-webhook-received` para
+   `/api/webhooks/zapi/{instanceId}?t=...`.
+5. Cria Inbox **API** no Chatwoot da empresa e liga em `chatwoot_inboxes.connection_id`.
+6. Webhooks Z-API entram na fila `webhook_events` (provider `zapi`), atualizam o espelho e tentam abrir
+   conversa/mensagem no Chatwoot.
+7. Limite do plano via trigger `enforce_whatsapp_limit`. Desconexão limpa webhook Z-API, remove Inbox e descarta segredos.
 
-Pré-requisitos externos (não existem hoje): app Meta verificado, Business Verification, aprovação das permissões
-`whatsapp_business_management` / `whatsapp_business_messaging`, configuração do Embedded Signup, domínio HTTPS.
+Pré-requisito: conta Z-API com instância já pareada (QR), Chatwoot provisionado, `NEXT_PUBLIC_APP_URL` HTTPS em produção.
 
 ## 8. IA, automações e planos (Fases 7–9)
 
@@ -235,7 +229,7 @@ Pré-requisitos externos (não existem hoje): app Meta verificado, Business Veri
 
 | # | Risco | Mitigação |
 | --- | --- | --- |
-| 1 | Embedded Signup/Tech Provider depende de aprovação da Meta (semanas) | Começar o processo cedo; Fase 4 só testável com app real; UI e backend prontos antes |
+| 1 | Z-API fora do padrão oficial Meta (risco de banimento do número) | Boas práticas Z-API; limites de envio; opção futura de provedor `meta` no mesmo modelo de conexões |
 | 2 | Comportamento da Platform API/webhooks varia por versão do Chatwoot CE | Fixar versão do Chatwoot em produção; testes de contrato com instância real **[VERIFICAR]** |
 | 3 | Vazamento entre tenants por uso indevido do service role | Service role isolado em `lib/database/service.ts` (`server-only`), sempre com `organization_id` resolvido; testes RLS; revisão obrigatória |
 | 4 | Tokens (Chatwoot/Meta/IA) em banco | Cifrados, sem leitura via RLS, rotação por `key_id`; migrar para Supabase Vault/KMS se exigido |
@@ -254,7 +248,7 @@ Pré-requisitos externos (não existem hoje): app Meta verificado, Business Veri
 | 1 | Auditoria + arquitetura | ✅ |
 | 2 | Design system, layout, auth, empresas, usuários, permissões, isolamento, testes RLS | ✅ (sem Supabase real: ver `docs/SETUP.md`) |
 | 3 | Cliente Chatwoot, contas, agentes, espelho, webhooks idempotentes, cron, dead-letter admin | ✅ (header `api-access-token`; WhatsApp Inbox = Fase 4) |
-| 4 | Embedded Signup, conexão de números, provisionamento, limites, desconexão | ⏳ |
+| 4 | Z-API: conectar instância, webhook, Inbox Chatwoot, limites, desconexão | ✅ |
 | 5 | Inbox 3 colunas, Realtime, atribuições, filtros | ⏳ |
 | 6 | Contatos + CRM | ⏳ |
 | 7 | IA | ⏳ |

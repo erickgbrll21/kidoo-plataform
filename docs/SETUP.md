@@ -34,6 +34,9 @@ As migrations ficam em `supabase/migrations` e **devem ser aplicadas em ordem**:
 1. `20261104120000_identity_and_tenancy.sql` — perfis, empresas, papéis, permissões, membros, equipes, auditoria, rate limit, RLS
 2. `20261104120100_plans_and_limits.sql` — planos (Starter, Growth, Business, Enterprise), assinaturas, limites efetivos
 3. `20261104120200_invitations_and_org_functions.sql` — convites, `create_organization`, `accept_invitation`
+4. `20261104210000_chatwoot_integration.sql` — Chatwoot (segredos, contas, espelho, webhooks)
+5. `20261105140000_whatsapp_connections.sql` — WhatsApp / Z-API (conexões, limites, resource_key nos segredos)
+6. `20261105150000_whatsapp_zapi_from_meta.sql` — só se o ambiente já tinha o schema Meta intermediário
 
 Opção A — Supabase CLI:
 
@@ -109,7 +112,7 @@ Os testes de banco rodam em memória (PGlite) e **não** precisam de Supabase. E
 |---|---|---|
 | Envio automático de convites por e-mail | 2 | Provedor de e-mail (Resend, SES, SMTP). Hoje o link do convite é exibido uma única vez para copiar. |
 | Chatwoot self-hosted | 3 | ✅ `CHATWOOT_*`, `KIDOO_ENCRYPTION_KEY`, `CRON_SECRET`. Header `api-access-token`. Cron Vercel Hobby: `0 6 * * *` (1×/dia) → `/api/cron/chatwoot-webhooks`. Pro libera intervalo menor. |
-| Meta WhatsApp Cloud API / Embedded Signup | 4 | App Meta verificado (Business Verification), configuração de Embedded Signup e webhook. |
+| WhatsApp via Z-API | 4 | Conta Z-API + instância conectada (QR). Credenciais entram na UI `/canais` (Instance ID, Token, Client-Token). Webhook HTTPS exige `NEXT_PUBLIC_APP_URL` público. |
 | Provedores de IA | 7 | Chaves Anthropic / OpenAI / Google. |
 | Cobrança (Stripe / Mercado Pago) | 9 | Conta no gateway; o modelo de dados já tem `billing_provider`. |
 | CSP completa (`script-src` com nonce) | hardening | Hoje só `frame-ancestors`, `base-uri` e `form-action`. |

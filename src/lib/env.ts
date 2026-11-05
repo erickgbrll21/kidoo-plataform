@@ -15,7 +15,7 @@ const publicSchema = z.object({
 
 const serverSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
-  /** 32 bytes em base64 — cifra tokens de integrações (Chatwoot/Meta/IA). */
+  /** 32 bytes em base64 — cifra tokens de integrações (Chatwoot/Z-API/IA). */
   KIDOO_ENCRYPTION_KEY: z.string().optional(),
   KIDOO_ENCRYPTION_KEY_ID: z.string().default("v1"),
   /** Instância Chatwoot self-hosted (Fase 3). Ausente = integração desligada. */

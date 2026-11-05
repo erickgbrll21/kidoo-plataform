@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/database/server";
 import type { Permission } from "./permissions";
@@ -44,6 +45,8 @@ export type ContextResult =
   | TenantContext;
 
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
+  // JWT do Supabase usa Date.now(); marca request-time para Cache Components.
+  await connection();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;

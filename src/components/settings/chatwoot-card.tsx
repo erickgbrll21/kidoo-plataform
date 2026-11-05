@@ -4,6 +4,7 @@ import * as React from "react";
 import { provisionChatwootAction } from "@/app/(dashboard)/configuracoes/actions";
 import { ActionMessage } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { LocalDateTime } from "@/components/ui/local-datetime";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { ActionState } from "@/lib/actions";
 
@@ -55,7 +56,9 @@ export function ChatwootCard({
             {provisionedAt ? (
               <div className="sm:col-span-2">
                 <dt className="text-xs font-medium tracking-wide text-kidoo-500 uppercase">Provisionada em</dt>
-                <dd className="mt-1 text-sm text-kidoo-800">{new Date(provisionedAt).toLocaleString("pt-BR")}</dd>
+                <dd className="mt-1 text-sm text-kidoo-800">
+                  <LocalDateTime value={provisionedAt} />
+                </dd>
               </div>
             ) : null}
           </dl>

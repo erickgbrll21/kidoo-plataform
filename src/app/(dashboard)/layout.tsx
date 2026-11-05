@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { AppShell } from "@/components/layout/app-shell";
 import { SetupRequired } from "@/components/layout/setup-required";
 import { ShellSkeleton } from "@/components/layout/shell-skeleton";
@@ -8,8 +9,12 @@ import { isSupabaseConfigured } from "@/lib/env";
 /**
  * Casca autenticada. A leitura de cookies/sessão acontece DENTRO do Suspense, para que
  * o skeleton seja servido imediatamente (Cache Components / prefetch parcial).
+ *
+ * `connection()` marca request-time: o JWT do Supabase usa Date.now() e não pode
+ * participar do prerender estático / Instant Navigations.
  */
 async function Shell({ children }: { children: React.ReactNode }) {
+  await connection();
   const [ctx, platformAdmin] = await Promise.all([requireTenantContext(), isPlatformAdmin()]);
 
   return (

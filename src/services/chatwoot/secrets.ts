@@ -1,27 +1,35 @@
 import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
-import { chatwootEnv } from "@/lib/env";
+import { EnvError, serverEnv } from "@/lib/env";
 import { createServiceClient } from "@/lib/database/service";
 import { decryptSecret, encryptSecret, keyRingFromEnv } from "@/lib/security/crypto";
 
 function ring() {
-  const env = chatwootEnv();
+  const env = serverEnv();
+  if (!env.KIDOO_ENCRYPTION_KEY) {
+    throw new EnvError("KIDOO_ENCRYPTION_KEY é obrigatória para cifrar tokens de integração.");
+  }
   return keyRingFromEnv({
-    KIDOO_ENCRYPTION_KEY: env.encryptionKey,
-    KIDOO_ENCRYPTION_KEY_ID: env.encryptionKeyId,
+    KIDOO_ENCRYPTION_KEY: env.KIDOO_ENCRYPTION_KEY,
+    KIDOO_ENCRYPTION_KEY_ID: env.KIDOO_ENCRYPTION_KEY_ID,
   });
 }
 
-export function aadFor(organizationId: string, purpose: string) {
-  return `org:${organizationId}:${purpose}`;
+export function aadFor(organizationId: string, purpose: string, resourceKey = "") {
+  return resourceKey
+    ? `org:${organizationId}:${purpose}:${resourceKey}`
+    : `org:${organizationId}:${purpose}`;
 }
 
 export async function storeSecret(input: {
   organizationId: string;
-  purpose: "chatwoot_account_token" | "chatwoot_webhook" | "meta_whatsapp" | "ai_provider";
+  purpose: "chatwoot_account_token" | "chatwoot_webhook" | "meta_whatsapp" | "zapi_instance" | "ai_provider";
   plaintext: string;
+  /** Diferencia vários segredos do mesmo purpose (ex.: phone_number_id). */
+  resourceKey?: string;
 }): Promise<{ id: string }> {
-  const aad = aadFor(input.organizationId, input.purpose);
+  const resourceKey = input.resourceKey ?? "";
+  const aad = aadFor(input.organizationId, input.purpose, resourceKey);
   const ciphertext = encryptSecret(input.plaintext, ring(), aad);
   const db = createServiceClient();
   const { data, error } = await db
@@ -30,12 +38,13 @@ export async function storeSecret(input: {
       {
         organization_id: input.organizationId,
         purpose: input.purpose,
+        resource_key: resourceKey,
         ciphertext,
         key_id: ring().current,
         aad,
         rotated_at: new Date().toISOString(),
       },
-      { onConflict: "organization_id,purpose" },
+      { onConflict: "organization_id,purpose,resource_key" },
     )
     .select("id")
     .single();
@@ -55,6 +64,11 @@ export async function readSecret(secretId: string, organizationId: string, purpo
     throw new Error("Segredo não pertence a este contexto.");
   }
   return decryptSecret(data.ciphertext as string, ring(), data.aad as string);
+}
+
+export async function deleteSecret(secretId: string): Promise<void> {
+  const db = createServiceClient();
+  await db.from("integration_secrets").delete().eq("id", secretId);
 }
 
 export function generateWebhookSecret() {

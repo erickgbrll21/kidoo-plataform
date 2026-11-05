@@ -184,8 +184,8 @@ export async function sweepPendingWebhooks(limit = 20) {
   const db = createServiceClient();
   const { data } = await db
     .from("webhook_events")
-    .select("id")
-    .eq("provider", "chatwoot")
+    .select("id, provider")
+    .in("provider", ["chatwoot", "zapi"])
     .eq("status", "pending")
     .lte("available_at", new Date().toISOString())
     .order("created_at", { ascending: true })
@@ -193,7 +193,12 @@ export async function sweepPendingWebhooks(limit = 20) {
 
   const results = [];
   for (const row of data ?? []) {
-    results.push(await processWebhookEvent(row.id as string));
+    if (row.provider === "zapi") {
+      const { processZapiWebhookEvent } = await import("@/services/whatsapp/webhooks");
+      results.push(await processZapiWebhookEvent(row.id as string));
+    } else {
+      results.push(await processWebhookEvent(row.id as string));
+    }
   }
   return results;
 }
@@ -214,7 +219,7 @@ export async function listDeadWebhookEvents(limit = 50): Promise<DeadWebhookRow[
   const { data } = await db
     .from("webhook_events")
     .select("id, organization_id, event_type, attempts, last_error, created_at")
-    .eq("provider", "chatwoot")
+    .in("provider", ["chatwoot", "zapi"])
     .eq("status", "dead")
     .order("created_at", { ascending: false })
     .limit(limit);

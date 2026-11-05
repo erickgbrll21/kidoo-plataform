@@ -10,6 +10,7 @@ import { auditLabel } from "@/lib/audit-labels";
 import { can, requireTenantContext } from "@/lib/auth/dal";
 import { formatDateTime } from "@/lib/utils";
 import { countActiveMembers, getEffectiveLimits, getPlanSummary, listAuditLogs } from "@/services/organizations/service";
+import { listWhatsappConnections } from "@/services/whatsapp/list";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -52,18 +53,20 @@ async function Overview() {
   const ctx = await requireTenantContext();
   const orgId = ctx.organization.id;
 
-  const [limits, members, activity] = await Promise.all([
+  const [limits, members, activity, whatsapp] = await Promise.all([
     getEffectiveLimits(orgId),
     countActiveMembers(orgId),
     can(ctx, "audit.read") ? listAuditLogs(orgId, 8) : Promise.resolve([]),
+    can(ctx, "channels.read") ? listWhatsappConnections(orgId) : Promise.resolve([]),
   ]);
   const plan = limits ? await getPlanSummary(limits.plan_key) : null;
   const firstName = ctx.user.fullName.split(" ")[0] || "";
+  const waActive = whatsapp.filter((c) => c.status === "active" || c.status === "pending").length;
 
   const steps = [
     { done: true, label: "Criar a empresa", href: null as string | null, soon: false },
     { done: members > 1, label: "Convidar a equipe", href: "/equipe", soon: false },
-    { done: false, label: "Conectar um número de WhatsApp", href: null, soon: true },
+    { done: waActive > 0, label: "Conectar um número de WhatsApp", href: "/canais", soon: false },
     { done: false, label: "Criar um agente de IA", href: null, soon: true },
   ];
 
@@ -84,8 +87,8 @@ async function Overview() {
         />
         <StatCard
           label="Números de WhatsApp"
-          value="—"
-          hint={`Limite do plano: ${limitText(limits?.max_whatsapp_numbers)} · conexão na Fase 4`}
+          value={String(waActive)}
+          hint={`Limite do plano: ${limitText(limits?.max_whatsapp_numbers)}`}
           icon={Radio}
         />
         <StatCard
