@@ -14,7 +14,7 @@ import {
 import { isChatwootConfigured } from "@/lib/env";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { connectZapiInstance } from "@/services/whatsapp/connect";
-import { disconnectWhatsappNumber } from "@/services/whatsapp/disconnect";
+import { disconnectWhatsappNumber, removeWhatsappConnection } from "@/services/whatsapp/disconnect";
 
 const connectSchema = z.object({
   instanceId: z.string().trim().min(3, "Instance ID inválido.").max(64),
@@ -59,7 +59,12 @@ export async function connectZapiAction(_prev: ActionState, formData: FormData):
 
   revalidatePath("/canais");
   revalidatePath("/dashboard");
-  return result.ok ? succeed("Instância Z-API conectada.") : fail(result.error, { values });
+  if (!result.ok) return fail(result.error, { values });
+  return succeed(
+    result.data.webhookConfigured
+      ? "Instância Z-API conectada."
+      : "Instância conectada, mas sem webhook: este ambiente não é HTTPS, então mensagens recebidas não chegam.",
+  );
 }
 
 export async function disconnectWhatsappAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -77,5 +82,25 @@ export async function disconnectWhatsappAction(_prev: ActionState, formData: For
 
   revalidatePath("/canais");
   revalidatePath("/dashboard");
+  revalidatePath("/inbox");
   return result.ok ? succeed("Número desconectado.") : fail(result.error);
+}
+
+export async function removeWhatsappAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const auth = await authorizeAction("channels.manage");
+  if (!auth.ok) return auth.state;
+
+  const parsed = disconnectSchema.safeParse(formObject(formData));
+  if (!parsed.success) return fail("Conexão inválida.", { fieldErrors: fieldErrorsOf(parsed.error) });
+
+  const result = await removeWhatsappConnection({
+    organizationId: auth.ctx.organization.id,
+    userId: auth.ctx.user.id,
+    connectionId: parsed.data.connectionId,
+  });
+
+  revalidatePath("/canais");
+  revalidatePath("/dashboard");
+  revalidatePath("/inbox");
+  return result.ok ? succeed("Instância Z-API removida.") : fail(result.error);
 }

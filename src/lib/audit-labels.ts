@@ -13,6 +13,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "chatwoot.agent_linked": "Agente Chatwoot vinculado",
   "whatsapp.connected": "WhatsApp conectado",
   "whatsapp.disconnected": "WhatsApp desconectado",
+  "whatsapp.removed": "Instância WhatsApp removida",
 };
 
 export const auditLabel = (action: string) => AUDIT_ACTION_LABELS[action] ?? action;

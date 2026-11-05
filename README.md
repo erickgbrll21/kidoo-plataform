@@ -20,5 +20,5 @@ npm run build      # produção
 
 ## Estado atual
 
-Fases 1–4 em código (Chatwoot + WhatsApp via Z-API em `/canais`).
-Próximo: Fase 5 (Inbox). Detalhes em `docs/ARCHITECTURE.md` e `docs/SETUP.md`.
+Fases 1–5 em código (Chatwoot + Z-API + Inbox em `/inbox`).
+Próximo: Fase 6 (Contatos + CRM). Detalhes em `docs/ARCHITECTURE.md` e `docs/SETUP.md`.

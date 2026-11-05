@@ -1,6 +1,6 @@
 "use client";
 
-import { disconnectWhatsappAction } from "@/app/(dashboard)/canais/actions";
+import { disconnectWhatsappAction, removeWhatsappAction } from "@/app/(dashboard)/canais/actions";
 import { ConnectZapiForm } from "@/components/channels/connect-zapi-form";
 import { InlineActionButton } from "@/components/team/inline-action";
 import { Badge } from "@/components/ui/badge";
@@ -85,17 +85,25 @@ export function ChannelsPanel({
                   </Td>
                   {canManage ? (
                     <Td>
-                      <div className="flex justify-end">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         {c.status !== "disconnected" ? (
                           <InlineActionButton
                             action={disconnectWhatsappAction}
                             fields={{ connectionId: c.id }}
-                            variant="danger-outline"
-                            confirmMessage={`Desconectar ${c.displayPhoneNumber || c.instanceId}?`}
+                            variant="outline"
+                            confirmMessage={`Desconectar ${c.displayPhoneNumber || c.instanceId}? O webhook e a Inbox Chatwoot serão limpos.`}
                           >
                             Desconectar
                           </InlineActionButton>
                         ) : null}
+                        <InlineActionButton
+                          action={removeWhatsappAction}
+                          fields={{ connectionId: c.id }}
+                          variant="danger-outline"
+                          confirmMessage={`Remover a instância ${c.displayPhoneNumber || c.instanceId}? Esta ação apaga a conexão da KIDOO (webhook, Inbox API e segredos). A instância na Z-API continua existindo no painel deles.`}
+                        >
+                          Remover
+                        </InlineActionButton>
                       </div>
                     </Td>
                   ) : null}

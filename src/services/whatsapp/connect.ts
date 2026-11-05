@@ -30,7 +30,9 @@ function normalizePhone(raw: string) {
  * Conecta uma instância Z-API: valida status → cifra credenciais →
  * configura webhook HTTPS → cria Inbox API no Chatwoot.
  */
-export async function connectZapiInstance(input: ConnectZapiInput): Promise<Result<{ connectionId: string }>> {
+export async function connectZapiInstance(
+  input: ConnectZapiInput,
+): Promise<Result<{ connectionId: string; webhookConfigured: boolean }>> {
   if (!isChatwootConfigured()) return { ok: false, error: "Chatwoot não está configurado." };
 
   const account = await getAccountAccessToken(input.organizationId);
@@ -122,8 +124,9 @@ export async function connectZapiInstance(input: ConnectZapiInput): Promise<Resu
     connectionId = conn.id as string;
 
     const webhookUrl = `${appUrl}/api/webhooks/zapi/${encodeURIComponent(creds.instanceId)}?t=${encodeURIComponent(webhookPlain)}`;
-    // Em localhost o HTTPS da Z-API falha — ainda assim grava a URL esperada em produção
-    if (appUrl.startsWith("https://")) {
+    // A Z-API só entrega em URL HTTPS pública; em localhost a conexão fica sem recebimento.
+    const webhookConfigured = appUrl.startsWith("https://");
+    if (webhookConfigured) {
       await setReceivedWebhook(creds, webhookUrl);
     }
 
@@ -159,7 +162,7 @@ export async function connectZapiInstance(input: ConnectZapiInput): Promise<Resu
       p_actor_type: "user",
     });
 
-    return { ok: true, data: { connectionId } };
+    return { ok: true, data: { connectionId, webhookConfigured } };
   } catch (err) {
     const message =
       err instanceof ZapiApiError

@@ -1,6 +1,6 @@
 # KIDOO HUB — Arquitetura
 
-> Documento vivo. Status: **Fases 1–4 em código** — Chatwoot ok; WhatsApp via **Z-API** (instância + webhook).
+> Documento vivo. Status: **Fases 1–5 em código** — Chatwoot, Z-API e **Inbox** (lista / thread / contato).
 > Itens marcados com **[VERIFICAR]** dependem de confirmação na versão instalada do Chatwoot / na conta Meta e
 > **não** devem ser tratados como fato até serem testados contra os serviços reais.
 
@@ -155,8 +155,8 @@ Papéis de sistema iniciais: `owner` (tudo + billing + excluir empresa), `admin`
 
 - Supabase Auth (e-mail/senha). Login, cadastro e logout por **Server Actions**; o navegador **não** manipula tokens.
 - Cookies de sessão do `@supabase/ssr` são gravados com `httpOnly`, `secure` (em produção) e `sameSite=lax`.
-  Nada vai para `localStorage`. (Quando o Realtime da Fase 5 precisar de token no cliente, será emitido por
-  endpoint dedicado e de curta duração — decisão adiada, registrada aqui.)
+  Nada vai para `localStorage`. A Inbox (Fase 5) usa `router.refresh` periódico; Realtime Supabase com
+  token curto no cliente permanece adiado.
 - `proxy.ts` renova a sessão e redireciona visitantes anônimos; a **autorização real** está no DAL
   (`lib/auth`) e no RLS. O DAL usa `auth.getUser()` (validação no servidor Auth), não apenas decodificação de JWT.
 - Rate limit de login/cadastro/recuperação em Postgres (`consume_rate_limit`), por IP + e-mail.
@@ -249,7 +249,7 @@ Pré-requisito: conta Z-API com instância já pareada (QR), Chatwoot provisiona
 | 2 | Design system, layout, auth, empresas, usuários, permissões, isolamento, testes RLS | ✅ (sem Supabase real: ver `docs/SETUP.md`) |
 | 3 | Cliente Chatwoot, contas, agentes, espelho, webhooks idempotentes, cron, dead-letter admin | ✅ (header `api-access-token`; WhatsApp Inbox = Fase 4) |
 | 4 | Z-API: conectar instância, webhook, Inbox Chatwoot, limites, desconexão | ✅ |
-| 5 | Inbox 3 colunas, Realtime, atribuições, filtros | ⏳ |
+| 5 | Inbox 3 colunas, filtros, atribuição, reply via Chatwoot; poll até Realtime | ✅ (Realtime Supabase adiado) |
 | 6 | Contatos + CRM | ⏳ |
 | 7 | IA | ⏳ |
 | 8 | Automações | ⏳ |

@@ -92,3 +92,57 @@ export async function disconnectWhatsappNumber(input: {
 
   return { ok: true, data: null };
 }
+
+/**
+ * Remove a instância de vez: limpa webhook/Inbox/segredos e apaga o registro.
+ * Use quando o admin não quer mais ver a conexão na lista.
+ */
+export async function removeWhatsappConnection(input: {
+  organizationId: string;
+  userId: string;
+  connectionId: string;
+}): Promise<Result<null>> {
+  const db = createServiceClient();
+  const { data: conn } = await db
+    .from("whatsapp_connections")
+    .select("id, status, display_phone_number, zapi_instance_id")
+    .eq("id", input.connectionId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle();
+
+  if (!conn) return { ok: false, error: "Conexão não encontrada." };
+
+  if (conn.status !== "disconnected") {
+    const cleaned = await disconnectWhatsappNumber(input);
+    if (!cleaned.ok) return cleaned;
+  }
+
+  await db
+    .from("chatwoot_inboxes")
+    .delete()
+    .eq("organization_id", input.organizationId)
+    .eq("connection_id", input.connectionId);
+
+  const { error } = await db
+    .from("whatsapp_connections")
+    .delete()
+    .eq("id", input.connectionId)
+    .eq("organization_id", input.organizationId);
+
+  if (error) return { ok: false, error: error.message };
+
+  await db.rpc("write_audit_log", {
+    p_organization_id: input.organizationId,
+    p_actor_user_id: input.userId,
+    p_action: "whatsapp.removed",
+    p_resource_type: "whatsapp_connection",
+    p_resource_id: input.connectionId,
+    p_metadata: {
+      display: conn.display_phone_number,
+      instance_id: conn.zapi_instance_id,
+    },
+    p_actor_type: "user",
+  });
+
+  return { ok: true, data: null };
+}
