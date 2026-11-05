@@ -340,3 +340,60 @@ describe("auditoria, privilégios e rate limit", () => {
     expect(other.allowed).toBe(true);
   });
 });
+
+describe("Chatwoot espelho — isolamento RLS", () => {
+  beforeAll(async () => {
+    await db.admin(
+      `insert into public.chatwoot_accounts (organization_id, chatwoot_account_id, status, provisioned_at)
+       values ($1, 101, 'active', now()), ($2, 202, 'active', now())
+       on conflict (organization_id) do update
+         set chatwoot_account_id = excluded.chatwoot_account_id, status = 'active'`,
+      [orgA, orgB],
+    );
+    await db.admin(
+      `insert into public.contacts_mirror (organization_id, chatwoot_contact_id, name)
+       values ($1, 1, 'Contato A'), ($2, 1, 'Contato B')
+       on conflict (organization_id, chatwoot_contact_id) do nothing`,
+      [orgA, orgB],
+    );
+    await db.admin(
+      `insert into public.conversations_index
+         (organization_id, chatwoot_account_id, chatwoot_conversation_id, status)
+       values ($1, 101, 11, 'open'), ($2, 202, 22, 'open')
+       on conflict (organization_id, chatwoot_conversation_id) do nothing`,
+      [orgA, orgB],
+    );
+    await db.admin(
+      `insert into public.webhook_events (organization_id, provider, idempotency_key, event_type, payload, status)
+       values ($1, 'chatwoot', 'key-a', 'message_created', '{}'::jsonb, 'dead'),
+              ($2, 'chatwoot', 'key-b', 'message_created', '{}'::jsonb, 'dead')
+       on conflict (provider, idempotency_key) do nothing`,
+      [orgA, orgB],
+    );
+  });
+
+  it("bob não lê contacts_mirror nem conversations_index da empresa A", async () => {
+    expect(await db.asUser(ids.bob!, `select 1 from public.contacts_mirror where organization_id = $1`, [orgA])).toHaveLength(0);
+    expect(await db.asUser(ids.bob!, `select 1 from public.conversations_index where organization_id = $1`, [orgA])).toHaveLength(0);
+  });
+
+  it("alice lê o espelho da própria empresa", async () => {
+    expect((await db.asUser(ids.alice!, `select 1 from public.contacts_mirror where organization_id = $1`, [orgA])).length).toBeGreaterThan(0);
+    expect((await db.asUser(ids.alice!, `select 1 from public.conversations_index where organization_id = $1`, [orgA])).length).toBeGreaterThan(0);
+  });
+
+  it("clientes autenticados não leem webhook_events (só service_role)", async () => {
+    expect(await errorOf(db.asUser(ids.alice!, `select 1 from public.webhook_events`))).toMatch(/permission denied|row-level security/);
+  });
+
+  it("idempotência: chave (provider, idempotency_key) é única", async () => {
+    const err = await errorOf(
+      db.admin(
+        `insert into public.webhook_events (organization_id, provider, idempotency_key, event_type, payload)
+         values ($1, 'chatwoot', 'key-a', 'message_created', '{}'::jsonb)`,
+        [orgA],
+      ),
+    );
+    expect(err).toMatch(/duplicate|unique/i);
+  });
+});

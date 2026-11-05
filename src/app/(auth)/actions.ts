@@ -163,7 +163,7 @@ export async function createOrganizationAction(_prev: ActionState, formData: For
     });
   }
 
-  // Fase 3: provisiona conta Chatwoot (falha não bloqueia o cadastro da empresa)
+  // Fase 3: provisiona conta Chatwoot + agente do owner (falha não bloqueia o cadastro)
   try {
     const { isChatwootConfigured } = await import("@/lib/env");
     if (isChatwootConfigured()) {
@@ -174,6 +174,10 @@ export async function createOrganizationAction(_prev: ActionState, formData: For
         organizationSlug: parsedInput.slug,
       });
       if (!cw.ok) console.error("[onboarding] chatwoot", cw.error);
+      else {
+        const { syncMissingAgentLinks } = await import("@/services/chatwoot/agents");
+        await syncMissingAgentLinks(result.data.id);
+      }
     }
   } catch (err) {
     console.error("[onboarding] chatwoot provision", err);

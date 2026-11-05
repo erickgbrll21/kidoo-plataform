@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/chatwoot-webhooks",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

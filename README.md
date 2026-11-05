@@ -20,6 +20,5 @@ npm run build      # produção
 
 ## Estado atual
 
-Fases 1–2 concluídas. Fase 3 (Chatwoot: cliente HTTP com header `api-access-token`, provisionamento de
-contas, webhooks idempotentes, espelho de conversas) implementada. Próximo: Fase 4 (WhatsApp / Meta).
-Detalhes em `docs/ARCHITECTURE.md` e `docs/SETUP.md`.
+Fases 1–3 concluídas (Chatwoot: provisionamento, agentes, webhooks + cron, dead-letter no admin).
+Próximo: Fase 4 (WhatsApp / Meta). Detalhes em `docs/ARCHITECTURE.md` e `docs/SETUP.md`.

@@ -1,6 +1,14 @@
 import "server-only";
 import { createServiceClient } from "@/lib/database/service";
 import type { Result } from "@/services/organizations/service";
+import {
+  listDeadWebhookEvents,
+  retryDeadWebhookEvent,
+  type DeadWebhookRow,
+} from "@/services/chatwoot/webhooks";
+
+export type { DeadWebhookRow };
+export { listDeadWebhookEvents, retryDeadWebhookEvent };
 
 /**
  * Operações da administração interna da KIDOO. Usam o service role (ignoram RLS),

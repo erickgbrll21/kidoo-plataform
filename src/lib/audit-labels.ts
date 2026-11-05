@@ -10,6 +10,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   "organization.suspended": "Empresa suspensa pela KIDOO",
   "organization.reactivated": "Empresa reativada pela KIDOO",
   "chatwoot.account_provisioned": "Conta Chatwoot provisionada",
+  "chatwoot.agent_linked": "Agente Chatwoot vinculado",
 };
 
 export const auditLabel = (action: string) => AUDIT_ACTION_LABELS[action] ?? action;

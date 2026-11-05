@@ -108,7 +108,7 @@ Os testes de banco rodam em memória (PGlite) e **não** precisam de Supabase. E
 | Item | Fase | Pendência |
 |---|---|---|
 | Envio automático de convites por e-mail | 2 | Provedor de e-mail (Resend, SES, SMTP). Hoje o link do convite é exibido uma única vez para copiar. |
-| Chatwoot self-hosted | 3 | ✅ Configurar `CHATWOOT_BASE_URL`, `CHATWOOT_PLATFORM_TOKEN`, `KIDOO_ENCRYPTION_KEY`, `CRON_SECRET`. Header HTTP obrigatório: `api-access-token` (hífen). |
+| Chatwoot self-hosted | 3 | ✅ `CHATWOOT_*`, `KIDOO_ENCRYPTION_KEY`, `CRON_SECRET`. Header `api-access-token`. Cron Vercel: `*/5 * * * *` → `/api/cron/chatwoot-webhooks` (`vercel.json`). |
 | Meta WhatsApp Cloud API / Embedded Signup | 4 | App Meta verificado (Business Verification), configuração de Embedded Signup e webhook. |
 | Provedores de IA | 7 | Chaves Anthropic / OpenAI / Google. |
 | Cobrança (Stripe / Mercado Pago) | 9 | Conta no gateway; o modelo de dados já tem `billing_provider`. |

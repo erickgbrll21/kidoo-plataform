@@ -1,26 +1,14 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/database/service";
 import type { ChatwootWebhookPayload } from "@/lib/integrations/chatwoot";
+import { buildWebhookIdempotencyKey } from "./idempotency";
 import { readSecret, webhookSecretMatches } from "./secrets";
+
+export { buildWebhookIdempotencyKey } from "./idempotency";
 
 export type IngestResult =
   | { ok: true; duplicate: boolean; eventId: string | null }
   | { ok: false; error: string; status: number };
-
-function idempotencyKey(payload: ChatwootWebhookPayload): string {
-  const accountId = payload.account?.id ?? "x";
-  const event = payload.event ?? "unknown";
-  const id =
-    payload.id ??
-    payload.conversation?.id ??
-    payload.conversation_id ??
-    payload.messages?.[0]?.id ??
-    "none";
-  const updated = payload.updated_at ?? payload.created_at ?? payload.conversation?.timestamp ?? "";
-  const raw = `${accountId}|${event}|${id}|${updated}`;
-  return createHash("sha256").update(String(raw)).digest("hex");
-}
 
 async function resolveOrgByChatwootAccount(chatwootAccountId: number) {
   const db = createServiceClient();
@@ -75,7 +63,7 @@ export async function ingestChatwootWebhook(
     }
   }
 
-  const key = idempotencyKey(payload);
+  const key = buildWebhookIdempotencyKey(payload);
   const db = createServiceClient();
   const { data, error } = await db
     .from("webhook_events")
@@ -208,4 +196,64 @@ export async function sweepPendingWebhooks(limit = 20) {
     results.push(await processWebhookEvent(row.id as string));
   }
   return results;
+}
+
+export type DeadWebhookRow = {
+  id: string;
+  organizationId: string | null;
+  organizationName: string | null;
+  eventType: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string;
+};
+
+/** Eventos em dead-letter (falha após retentativas). Somente admin/plataforma. */
+export async function listDeadWebhookEvents(limit = 50): Promise<DeadWebhookRow[]> {
+  const db = createServiceClient();
+  const { data } = await db
+    .from("webhook_events")
+    .select("id, organization_id, event_type, attempts, last_error, created_at")
+    .eq("provider", "chatwoot")
+    .eq("status", "dead")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const rows = data ?? [];
+  const orgIds = [...new Set(rows.map((r) => r.organization_id as string | null).filter(Boolean))] as string[];
+  const nameById = new Map<string, string>();
+  if (orgIds.length) {
+    const { data: orgs } = await db.from("organizations").select("id, name").in("id", orgIds);
+    for (const o of orgs ?? []) nameById.set(o.id as string, o.name as string);
+  }
+
+  return rows.map((r) => ({
+    id: r.id as string,
+    organizationId: (r.organization_id as string | null) ?? null,
+    organizationName: r.organization_id ? (nameById.get(r.organization_id as string) ?? null) : null,
+    eventType: r.event_type as string,
+    attempts: r.attempts as number,
+    lastError: (r.last_error as string | null) ?? null,
+    createdAt: r.created_at as string,
+  }));
+}
+
+/** Recoloca um evento dead na fila (pending). */
+export async function retryDeadWebhookEvent(eventId: string): Promise<{ ok: boolean; error?: string }> {
+  const db = createServiceClient();
+  const { data, error } = await db
+    .from("webhook_events")
+    .update({
+      status: "pending",
+      available_at: new Date().toISOString(),
+      last_error: null,
+    })
+    .eq("id", eventId)
+    .eq("status", "dead")
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Evento não encontrado ou não está em dead-letter." };
+  return { ok: true };
 }

@@ -95,6 +95,16 @@ export async function provisionChatwootAction(_prev: ActionState, _formData: For
     organizationName: auth.ctx.organization.name,
     organizationSlug: auth.ctx.organization.slug,
   });
+
+  if (result.ok) {
+    try {
+      const { syncMissingAgentLinks } = await import("@/services/chatwoot/agents");
+      await syncMissingAgentLinks(auth.ctx.organization.id);
+    } catch (err) {
+      console.error("[chatwoot] sync agents", err);
+    }
+  }
+
   revalidatePath("/configuracoes");
   revalidatePath("/canais");
   return result.ok

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Building2 } from "lucide-react";
+import { Building2, Webhook } from "lucide-react";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { InlineActionButton } from "@/components/team/inline-action";
@@ -11,14 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, Td, Th, Tr } from "@/components/ui/table";
 import { requirePlatformAdmin } from "@/lib/auth/dal";
 import { formatDate } from "@/lib/utils";
-import { listTenants } from "@/services/admin/service";
-import { reactivateTenantAction, suspendTenantAction } from "./actions";
+import { listDeadWebhookEvents, listTenants } from "@/services/admin/service";
+import { reactivateTenantAction, retryDeadWebhookAction, suspendTenantAction } from "./actions";
 
 export const metadata: Metadata = { title: "Administração" };
 
 async function AdminContent() {
   await requirePlatformAdmin(); // defesa em profundidade: a página nunca depende só do layout
-  const { rows, truncated } = await listTenants();
+  const [{ rows, truncated }, deadWebhooks] = await Promise.all([listTenants(), listDeadWebhookEvents(50)]);
 
   const active = rows.filter((r) => r.status === "active").length;
   const suspended = rows.length - active;
@@ -107,6 +107,65 @@ async function AdminContent() {
           </Table>
         )}
       </Card>
+
+      <div className="mt-10">
+        <PageHeader
+          title="Webhooks Chatwoot (dead-letter)"
+          description="Eventos que esgotaram as retentativas. Reenfileire para o cron processar de novo."
+        />
+        <Card className="mt-4 overflow-hidden">
+          {deadWebhooks.length === 0 ? (
+            <EmptyState
+              icon={Webhook}
+              title="Nenhum evento em dead-letter"
+              description="Quando um webhook falhar várias vezes, ele aparece aqui."
+            />
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Empresa</Th>
+                  <Th>Evento</Th>
+                  <Th>Tentativas</Th>
+                  <Th>Erro</Th>
+                  <Th>Quando</Th>
+                  <Th className="text-right">Ações</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {deadWebhooks.map((e) => (
+                  <Tr key={e.id}>
+                    <Td>
+                      <p className="font-medium text-kidoo-900">{e.organizationName ?? "—"}</p>
+                      {e.organizationId ? (
+                        <p className="font-mono text-xs text-kidoo-500">{e.organizationId.slice(0, 8)}…</p>
+                      ) : null}
+                    </Td>
+                    <Td className="font-mono text-xs">{e.eventType}</Td>
+                    <Td>{e.attempts}</Td>
+                    <Td className="max-w-xs truncate text-kidoo-500" title={e.lastError ?? undefined}>
+                      {e.lastError ?? "—"}
+                    </Td>
+                    <Td className="text-kidoo-500">{formatDate(e.createdAt)}</Td>
+                    <Td>
+                      <div className="flex justify-end">
+                        <InlineActionButton
+                          action={retryDeadWebhookAction}
+                          fields={{ eventId: e.id }}
+                          variant="secondary"
+                          confirmMessage="Reenfileirar este evento para novo processamento?"
+                        >
+                          Reenfileirar
+                        </InlineActionButton>
+                      </div>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
